@@ -1,0 +1,32 @@
+{
+  "name": "tg-img-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Telegram Channel image bridge for CloudFlare-ImgBed",
+  "main": "dist/src/server/index.js",
+  "scripts": {
+    "dev": "tsx src/server/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "webhook:set": "tsx scripts/registerWebhook.ts set",
+    "webhook:info": "tsx scripts/registerWebhook.ts info"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.23",
+    "@types/node": "^22.13.10",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}
