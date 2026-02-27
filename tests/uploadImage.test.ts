@@ -50,6 +50,72 @@ describe('uploadImageModule.uploadImageToImgBed', () => {
     vi.useRealTimers();
   });
 
+  it('content-type 非 image/* 时按原始扩展名推断 image/png', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 5, 2, 4, 9));
+
+    const appendSpy = vi.spyOn(FormData.prototype, 'append');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ src: '/images/a.png' }] }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await uploadImageModule.uploadImageToImgBed(
+      Buffer.from('abc'),
+      'application/octet-stream',
+      baseEnv,
+      createLogger('error'),
+      'photos/image_1.png'
+    );
+
+    const fileAppendCall = appendSpy.mock.calls.find((call) => call[0] === 'file');
+    const blob = fileAppendCall?.[1] as Blob;
+
+    expect(fileAppendCall?.[2]).toBe('20260205_020409.png');
+    expect(blob.type).toBe('image/png');
+
+    vi.useRealTimers();
+  });
+
+  it('content-type 非 image/* 且原始扩展名未知时回退 image/jpeg', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 5, 2, 4, 9));
+
+    const appendSpy = vi.spyOn(FormData.prototype, 'append');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ src: '/images/a.jpg' }] }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await uploadImageModule.uploadImageToImgBed(
+      Buffer.from('abc'),
+      'application/octet-stream',
+      baseEnv,
+      createLogger('error'),
+      'photos/file_without_ext'
+    );
+
+    const fileAppendCall = appendSpy.mock.calls.find((call) => call[0] === 'file');
+    const blob = fileAppendCall?.[1] as Blob;
+
+    expect(fileAppendCall?.[2]).toBe('20260205_020409.jpg');
+    expect(blob.type).toBe('image/jpeg');
+
+    vi.useRealTimers();
+  });
+
   it('解析 data[0].src 并拼接完整 URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ data: [{ src: '/images/a.jpg' }] }), {

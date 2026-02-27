@@ -94,7 +94,7 @@ export function createTelegramWebhookRouter(
 
       if (!uploadedUrl) {
         const downloaded = await downloadFn(fileId, env, logger);
-        uploadedUrl = await uploadFn(downloaded.buffer, downloaded.contentType, env, logger);
+        uploadedUrl = await uploadFn(downloaded.buffer, downloaded.contentType, env, logger, downloaded.filePath);
         dedupStore.setFileUploadUrl(fileId, uploadedUrl);
       }
 

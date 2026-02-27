@@ -43,7 +43,8 @@ describe('telegram webhook integration', () => {
 
     const downloadFn = vi.fn().mockResolvedValue({
       buffer: Buffer.from('img-bytes'),
-      contentType: 'image/jpeg'
+      contentType: 'image/jpeg',
+      filePath: 'photos/file_1.jpg'
     });
     const uploadFn = vi.fn().mockResolvedValue('https://imgbed.example/img/a.jpg');
     const sendMessageFn = vi.fn().mockResolvedValue(undefined);
@@ -75,7 +76,8 @@ describe('telegram webhook integration', () => {
 
     const downloadFn = vi.fn().mockResolvedValue({
       buffer: Buffer.from('img-bytes'),
-      contentType: 'image/jpeg'
+      contentType: 'image/jpeg',
+      filePath: 'photos/file_1.jpg'
     });
     const uploadFn = vi.fn().mockResolvedValue('https://imgbed.example/img/a.jpg');
     const sendMessageFn = vi.fn().mockResolvedValue(undefined);
@@ -147,7 +149,8 @@ describe('telegram webhook integration', () => {
       telegramWebhookDeps: {
         downloadFn: vi.fn().mockResolvedValue({
           buffer: Buffer.from('img-bytes'),
-          contentType: 'image/jpeg'
+          contentType: 'image/jpeg',
+          filePath: 'photos/file_3.jpg'
         }),
         uploadFn: vi.fn().mockRejectedValue(new Error('upload failed')),
         sendMessageFn: vi.fn()
@@ -173,7 +176,8 @@ describe('telegram webhook integration', () => {
       telegramWebhookDeps: {
         downloadFn: vi.fn().mockResolvedValue({
           buffer: Buffer.from('img-bytes'),
-          contentType: 'image/jpeg'
+          contentType: 'image/jpeg',
+          filePath: 'photos/file_4.jpg'
         }),
         uploadFn,
         sendMessageFn: vi.fn().mockRejectedValue(new Error('send failed'))

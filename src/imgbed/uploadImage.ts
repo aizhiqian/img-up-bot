@@ -39,6 +39,27 @@ function pickSrcFromResponse(json: ImgBedUploadResponse | null): string | undefi
   return typeof json.data?.[0]?.src === 'string' ? json.data[0].src : undefined;
 }
 
+const EXTENSION_TO_IMAGE_MIME_TYPE: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  avif: 'image/avif',
+  svg: 'image/svg+xml'
+};
+
+const IMAGE_MIME_TYPE_TO_EXTENSION: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'image/avif': 'avif',
+  'image/svg+xml': 'svg'
+};
+
 function buildTimestampFilename(date: Date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -50,11 +71,55 @@ function buildTimestampFilename(date: Date = new Date()): string {
   return `${year}${month}${day}_${hour}${minute}${second}`;
 }
 
+function normalizeMimeType(contentType: string | undefined): string | undefined {
+  if (!contentType) {
+    return undefined;
+  }
+
+  const mimeType = contentType.split(';')[0]?.trim().toLowerCase();
+  return mimeType || undefined;
+}
+
+function pickFileExtensionFromPath(sourceFilePath: string | undefined): string | undefined {
+  if (!sourceFilePath) {
+    return undefined;
+  }
+
+  const pathWithoutQuery = sourceFilePath.split('?')[0].split('#')[0];
+  const fileName = pathWithoutQuery.split('/').pop() ?? pathWithoutQuery;
+  const extensionIndex = fileName.lastIndexOf('.');
+
+  if (extensionIndex < 0 || extensionIndex === fileName.length - 1) {
+    return undefined;
+  }
+
+  return fileName.slice(extensionIndex + 1).toLowerCase();
+}
+
+function pickUploadMimeType(contentType: string | undefined, sourceFilePath: string | undefined): string {
+  const mimeType = normalizeMimeType(contentType);
+  if (mimeType?.startsWith('image/')) {
+    return mimeType;
+  }
+
+  const extension = pickFileExtensionFromPath(sourceFilePath);
+  if (extension && EXTENSION_TO_IMAGE_MIME_TYPE[extension]) {
+    return EXTENSION_TO_IMAGE_MIME_TYPE[extension];
+  }
+
+  return 'image/jpeg';
+}
+
+function pickFilenameExtension(uploadMimeType: string): string {
+  return IMAGE_MIME_TYPE_TO_EXTENSION[uploadMimeType] ?? 'jpg';
+}
+
 export async function uploadImageToImgBed(
   fileBuffer: Buffer,
   contentType: string | undefined,
   env: AppEnv,
-  logger: Logger
+  logger: Logger,
+  sourceFilePath?: string
 ): Promise<string> {
   const uploadUrl = `${env.imgbedBaseUrl}${env.imgbedUploadPath.startsWith('/') ? '' : '/'}${env.imgbedUploadPath}`;
   const startedAt = Date.now();
@@ -62,8 +127,10 @@ export async function uploadImageToImgBed(
   const resultUrl = await withRetry(
     async () => {
       const formData = new FormData();
-      const blob = new Blob([new Uint8Array(fileBuffer)], { type: contentType ?? 'application/octet-stream' });
-      formData.append('file', blob, `${buildTimestampFilename()}.jpg`);
+      const uploadMimeType = pickUploadMimeType(contentType, sourceFilePath);
+      const fileExtension = pickFilenameExtension(uploadMimeType);
+      const blob = new Blob([new Uint8Array(fileBuffer)], { type: uploadMimeType });
+      formData.append('file', blob, `${buildTimestampFilename()}.${fileExtension}`);
 
       const response = await fetchWithTimeout(
         uploadUrl,

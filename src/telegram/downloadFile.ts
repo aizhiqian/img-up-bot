@@ -22,7 +22,7 @@ export async function downloadTelegramPhoto(
   fileId: string,
   env: AppEnv,
   logger: Logger
-): Promise<{ buffer: Buffer; contentType: string | undefined }> {
+): Promise<{ buffer: Buffer; contentType: string | undefined; filePath: string }> {
   const startedAt = Date.now();
 
   const getFileResult = await withRetry(
@@ -106,6 +106,7 @@ export async function downloadTelegramPhoto(
 
   return {
     buffer,
-    contentType: downloadResponse.headers.get('content-type') ?? undefined
+    contentType: downloadResponse.headers.get('content-type') ?? undefined,
+    filePath: getFileResult
   };
 }
