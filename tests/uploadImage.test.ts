@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppEnv } from '../src/config/env';
-import { uploadImageToImgBed } from '../src/imgbed/uploadImage';
+import * as uploadImageModule from '../src/imgbed/uploadImage';
 import { createLogger } from '../src/utils/logger';
 
 const baseEnv: AppEnv = {
@@ -21,9 +21,33 @@ const baseEnv: AppEnv = {
   dedupStoreType: 'memory'
 };
 
-describe('uploadImageToImgBed', () => {
+describe('uploadImageModule.uploadImageToImgBed', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('上传文件名使用 yyyyMMdd_HHmmss 格式', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 5, 2, 4, 9));
+
+    const appendSpy = vi.spyOn(FormData.prototype, 'append');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ src: '/images/a.jpg' }] }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      })
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), 'image/jpeg', baseEnv, createLogger('error'));
+
+    const fileAppendCall = appendSpy.mock.calls.find((call) => call[0] === 'file');
+    expect(fileAppendCall?.[2]).toBe('20260205_020409.jpg');
+
+    vi.useRealTimers();
   });
 
   it('解析 data[0].src 并拼接完整 URL', async () => {
@@ -38,7 +62,7 @@ describe('uploadImageToImgBed', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const url = await uploadImageToImgBed(Buffer.from('abc'), 'image/jpeg', baseEnv, createLogger('error'));
+    const url = await uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), 'image/jpeg', baseEnv, createLogger('error'));
 
     expect(url).toBe('https://imgbed.example/images/a.jpg');
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -53,7 +77,7 @@ describe('uploadImageToImgBed', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const url = await uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'));
+    const url = await uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'));
 
     expect(url).toBe('https://cdn.example/file.jpg');
   });
@@ -67,7 +91,7 @@ describe('uploadImageToImgBed', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'))).rejects.toThrow(
+    await expect(uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'))).rejects.toThrow(
       /ImgBed upload HTTP 401/
     );
   });
@@ -80,7 +104,7 @@ describe('uploadImageToImgBed', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const url = await uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'));
+    const url = await uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'));
 
     expect(url).toBe('https://imgbed.example/ok.jpg');
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -95,7 +119,7 @@ describe('uploadImageToImgBed', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const url = await uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'));
+    const url = await uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'));
 
     expect(url).toBe('https://imgbed.example/file/abc.jpg');
   });
@@ -105,7 +129,7 @@ describe('uploadImageToImgBed', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'))).rejects.toThrow(
+    await expect(uploadImageModule.uploadImageToImgBed(Buffer.from('abc'), undefined, baseEnv, createLogger('error'))).rejects.toThrow(
       /invalid response/
     );
   });

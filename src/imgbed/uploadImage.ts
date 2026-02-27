@@ -39,6 +39,17 @@ function pickSrcFromResponse(json: ImgBedUploadResponse | null): string | undefi
   return typeof json.data?.[0]?.src === 'string' ? json.data[0].src : undefined;
 }
 
+function buildTimestampFilename(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  const second = String(date.getSeconds()).padStart(2, '0');
+
+  return `${year}${month}${day}_${hour}${minute}${second}`;
+}
+
 export async function uploadImageToImgBed(
   fileBuffer: Buffer,
   contentType: string | undefined,
@@ -52,7 +63,7 @@ export async function uploadImageToImgBed(
     async () => {
       const formData = new FormData();
       const blob = new Blob([new Uint8Array(fileBuffer)], { type: contentType ?? 'application/octet-stream' });
-      formData.append('file', blob, 'telegram-image.jpg');
+      formData.append('file', blob, `${buildTimestampFilename()}.jpg`);
 
       const response = await fetchWithTimeout(
         uploadUrl,
