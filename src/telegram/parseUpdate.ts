@@ -30,6 +30,42 @@ function pickChannelPost(update: RecordValue): { post: RecordValue; isEdited: bo
   return null;
 }
 
+function pickFileFromPhoto(post: RecordValue): { fileId: string; fileUniqueId: string } | null {
+  if (!Array.isArray(post.photo) || post.photo.length === 0) {
+    return null;
+  }
+
+  const largest = post.photo[post.photo.length - 1];
+  if (!isRecord(largest) || typeof largest.file_id !== 'string') {
+    return null;
+  }
+
+  return {
+    fileId: largest.file_id,
+    fileUniqueId: typeof largest.file_unique_id === 'string' ? largest.file_unique_id : ''
+  };
+}
+
+function pickFileFromImageDocument(post: RecordValue): { fileId: string; fileUniqueId: string } | null {
+  if (!isRecord(post.document)) {
+    return null;
+  }
+
+  const document = post.document;
+  if (typeof document.file_id !== 'string') {
+    return null;
+  }
+
+  if (typeof document.mime_type !== 'string' || !document.mime_type.toLowerCase().startsWith('image/')) {
+    return null;
+  }
+
+  return {
+    fileId: document.file_id,
+    fileUniqueId: typeof document.file_unique_id === 'string' ? document.file_unique_id : ''
+  };
+}
+
 export function parseUpdate(update: unknown, allowedChatIds: Set<string>): ParsedPhotoUpdate | null {
   if (!isRecord(update)) {
     return null;
@@ -55,20 +91,16 @@ export function parseUpdate(update: unknown, allowedChatIds: Set<string>): Parse
     return null;
   }
 
-  if (!Array.isArray(post.photo) || post.photo.length === 0) {
-    return null;
-  }
-
-  const largest = post.photo[post.photo.length - 1];
-  if (!isRecord(largest) || typeof largest.file_id !== 'string') {
+  const picked = pickFileFromPhoto(post) ?? pickFileFromImageDocument(post);
+  if (!picked) {
     return null;
   }
 
   return {
     chatId,
     messageId: post.message_id,
-    fileId: largest.file_id,
-    fileUniqueId: typeof largest.file_unique_id === 'string' ? largest.file_unique_id : '',
+    fileId: picked.fileId,
+    fileUniqueId: picked.fileUniqueId,
     isEdited
   };
 }

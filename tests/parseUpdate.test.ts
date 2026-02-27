@@ -55,7 +55,45 @@ describe('parseUpdate', () => {
     expect(parseUpdate(update, allowedChatIds)).toBeNull();
   });
 
-  it('忽略没有 photo 的消息', () => {
+  it('支持 document 图片消息', () => {
+    const update = {
+      channel_post: {
+        message_id: 77,
+        chat: { id: -100123 },
+        document: {
+          file_id: 'doc-image-file',
+          file_unique_id: 'doc-image-unique',
+          mime_type: 'image/png'
+        }
+      }
+    };
+
+    expect(parseUpdate(update, allowedChatIds)).toEqual({
+      chatId: '-100123',
+      messageId: 77,
+      fileId: 'doc-image-file',
+      fileUniqueId: 'doc-image-unique',
+      isEdited: false
+    });
+  });
+
+  it('忽略非图片 document 消息', () => {
+    const update = {
+      channel_post: {
+        message_id: 88,
+        chat: { id: -100123 },
+        document: {
+          file_id: 'doc-text-file',
+          file_unique_id: 'doc-text-unique',
+          mime_type: 'text/plain'
+        }
+      }
+    };
+
+    expect(parseUpdate(update, allowedChatIds)).toBeNull();
+  });
+
+  it('忽略没有 photo/document 的消息', () => {
     const update = {
       channel_post: {
         message_id: 1,

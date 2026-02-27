@@ -36,6 +36,21 @@ function validUpdate(messageId: number): Record<string, unknown> {
   };
 }
 
+function validDocumentImageUpdate(messageId: number): Record<string, unknown> {
+  return {
+    update_id: 2000 + messageId,
+    channel_post: {
+      message_id: messageId,
+      chat: { id: -100123 },
+      document: {
+        file_id: `doc-file-${messageId}`,
+        file_unique_id: `doc-u-${messageId}`,
+        mime_type: 'image/png'
+      }
+    }
+  };
+}
+
 describe('telegram webhook integration', () => {
   it('完整链路：webhook -> 下载 -> 上传 -> 回写', async () => {
     const env = makeEnv();
@@ -137,6 +152,39 @@ describe('telegram webhook integration', () => {
     expect(response.body.ignored).toBe(true);
     expect(downloadFn).not.toHaveBeenCalled();
     expect(uploadFn).not.toHaveBeenCalled();
+  });
+
+  it('document 图片消息可走完整上传链路', async () => {
+    const env = makeEnv();
+    const dedup = createDedupStore('memory');
+
+    const downloadFn = vi.fn().mockResolvedValue({
+      buffer: Buffer.from('img-bytes'),
+      contentType: 'application/octet-stream',
+      filePath: 'documents/local_upload.png'
+    });
+    const uploadFn = vi.fn().mockResolvedValue('https://imgbed.example/img/doc.png');
+    const sendMessageFn = vi.fn().mockResolvedValue(undefined);
+
+    const app = createApp({
+      env,
+      logger: createLogger('error'),
+      dedupStore: dedup,
+      telegramWebhookDeps: {
+        downloadFn,
+        uploadFn,
+        sendMessageFn
+      }
+    });
+
+    const response = await request(app).post('/telegram/webhook').send(validDocumentImageUpdate(5));
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(response.body.url).toBe('https://imgbed.example/img/doc.png');
+    expect(downloadFn).toHaveBeenCalledTimes(1);
+    expect(uploadFn).toHaveBeenCalledTimes(1);
+    expect(sendMessageFn).toHaveBeenCalledTimes(1);
   });
 
   it('上传失败时返回 500', async () => {
