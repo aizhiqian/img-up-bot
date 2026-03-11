@@ -125,3 +125,65 @@ export async function answerCallbackQuery(
     cost_ms: Date.now() - startedAt
   });
 }
+
+export async function editBotMessageText(
+  chatId: string,
+  messageId: number,
+  text: string,
+  env: AppEnv,
+  logger: Logger,
+  options: {
+    replyMarkup?: unknown;
+    disableWebPagePreview?: boolean;
+  } = {}
+): Promise<void> {
+  const startedAt = Date.now();
+
+  await withRetry(
+    async () => {
+      const response = await fetchWithTimeout(
+        buildTelegramApiUrl(env.telegramBotToken, 'editMessageText'),
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            message_id: messageId,
+            text,
+            disable_web_page_preview: options.disableWebPagePreview ?? true,
+            reply_markup: options.replyMarkup
+          })
+        },
+        env.requestTimeoutMs
+      );
+
+      const raw = await response.text();
+      const json = readJsonSafe(raw) as TelegramApiResponse | null;
+
+      if (!response.ok) {
+        throw createHttpError(`Telegram editMessageText HTTP ${response.status}`, {
+          retryable: response.status >= 500 || response.status === 429,
+          status: response.status,
+          cause: truncateText(raw)
+        });
+      }
+
+      if (!json || !json.ok) {
+        throw createHttpError(`Telegram editMessageText invalid response: ${truncateText(raw)}`, {
+          retryable: false
+        });
+      }
+    },
+    {
+      maxAttempts: env.retryMaxAttempts
+    }
+  );
+
+  logger.info('telegram_bot_edit_message_text_success', {
+    chat_id: chatId,
+    message_id: messageId,
+    cost_ms: Date.now() - startedAt
+  });
+}

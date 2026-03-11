@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { AppEnv } from '../config/env';
-import { loadRuntimeConfig, mergeImgbedUploadPath } from '../config/runtimeConfig';
 import { uploadImageToImgBed } from '../imgbed/uploadImage';
 import { DedupStore } from '../storage/dedupStore';
-import { handleAdminMenuUpdate, parseAdminUpdate } from '../telegram/adminMenu';
+import { JsonFileUploadSettingsStore } from '../storage/uploadSettingsStore';
+import { applyUploadOverridesToPath, createBotSettingsHandler } from '../telegram/botSettings';
 import { downloadTelegramPhoto } from '../telegram/downloadFile';
 import { parseUpdate } from '../telegram/parseUpdate';
 import { sendChannelMessage } from '../telegram/sendChannelMessage';
@@ -13,7 +13,7 @@ export interface TelegramWebhookDependencies {
   downloadFn?: typeof downloadTelegramPhoto;
   uploadFn?: typeof uploadImageToImgBed;
   sendMessageFn?: typeof sendChannelMessage;
-  loadRuntimeConfigFn?: typeof loadRuntimeConfig;
+  botSettingsDeps?: Parameters<typeof createBotSettingsHandler>[3];
 }
 
 function messageKey(chatId: string, messageId: number): string {
@@ -52,31 +52,21 @@ export function createTelegramWebhookRouter(
   const downloadFn = dependencies.downloadFn ?? downloadTelegramPhoto;
   const uploadFn = dependencies.uploadFn ?? uploadImageToImgBed;
   const sendMessageFn = dependencies.sendMessageFn ?? sendChannelMessage;
-  const loadRuntimeConfigFn = dependencies.loadRuntimeConfigFn ?? loadRuntimeConfig;
 
-  const pendingByUserId = new Map<string, 'uploadFolder' | 'uploadChannel' | 'uploadNameType'>();
+  const uploadSettingsStore = new JsonFileUploadSettingsStore(env.botSettingsFilePath, logger);
+  const botSettingsHandler = createBotSettingsHandler(env, logger, uploadSettingsStore, dependencies.botSettingsDeps);
 
   router.post('/telegram/webhook', async (req: Request, res: Response, next: NextFunction) => {
     const startedAt = Date.now();
     const updateId = extractUpdateId(req.body);
 
+    const settingsHandled = await botSettingsHandler.handleUpdate(req.body);
+    if (settingsHandled) {
+      return res.status(200).json({ ok: true, settings: true });
+    }
+
     const parsed = parseUpdate(req.body, env.telegramAllowedChatIds);
     if (!parsed) {
-      const adminUpdate = parseAdminUpdate(req.body);
-      if (adminUpdate) {
-        try {
-          const cfg = await loadRuntimeConfigFn(env.runtimeConfigPath, logger);
-          await handleAdminMenuUpdate(adminUpdate, env, logger, cfg, pendingByUserId);
-        } catch (error) {
-          logger.error('telegram_admin_menu_failed', {
-            update_id: updateId,
-            error
-          });
-        }
-
-        return res.status(200).json({ ok: true, handled: true });
-      }
-
       logger.debug('telegram_update_ignored', {
         update_id: updateId
       });
@@ -115,15 +105,13 @@ export function createTelegramWebhookRouter(
 
       let uploadEnv = env;
       try {
-        const cfg = await loadRuntimeConfigFn(env.runtimeConfigPath, logger);
-        if (cfg.imgbed) {
-          uploadEnv = {
-            ...env,
-            imgbedUploadPath: mergeImgbedUploadPath(env.imgbedUploadPath, cfg.imgbed)
-          };
-        }
+        const overrides = await uploadSettingsStore.getOverrides();
+        uploadEnv = {
+          ...env,
+          imgbedUploadPath: applyUploadOverridesToPath(env.imgbedUploadPath, overrides)
+        };
       } catch (error) {
-        logger.warn('runtime_config_apply_failed', {
+        logger.warn('upload_settings_apply_failed', {
           update_id: updateId,
           error
         });

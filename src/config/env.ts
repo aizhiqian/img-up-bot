@@ -7,13 +7,15 @@ export interface AppEnv {
   telegramBotToken: string;
   telegramWebhookUrl: string;
   telegramAllowedChatIds: Set<string>;
+
   telegramAdminUserIds: Set<string>;
+  telegramUploadFolderPresets: string[];
+
+  botSettingsFilePath: string;
 
   imgbedBaseUrl: string;
   imgbedUploadToken: string;
   imgbedUploadPath: string;
-
-  runtimeConfigPath: string;
 
   requestTimeoutMs: number;
   retryMaxAttempts: number;
@@ -40,9 +42,21 @@ function optionalString(name: string): string | undefined {
   return value ? value : undefined;
 }
 
-function optionalPath(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value ? value : undefined;
+function parseOptionalStringArray(raw: string | undefined): string[] {
+  const value = raw?.trim();
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseUploadFolderPresets(raw: string | undefined): string[] {
+  const presets = parseOptionalStringArray(raw);
+  return presets.length > 0 ? presets : ['other'];
 }
 
 function parseNumber(name: string, fallback: number, options: { min?: number } = {}): number {
@@ -146,13 +160,15 @@ export function loadEnv(): AppEnv {
     telegramBotToken: requireString('TELEGRAM_BOT_TOKEN'),
     telegramWebhookUrl: requireString('TELEGRAM_WEBHOOK_URL'),
     telegramAllowedChatIds: parseAllowedChatIds(telegramAllowedChatIdsRaw),
+
     telegramAdminUserIds: parseOptionalIdSet(process.env.TELEGRAM_ADMIN_USER_IDS),
+    telegramUploadFolderPresets: parseUploadFolderPresets(process.env.TELEGRAM_UPLOAD_FOLDER_PRESETS),
+
+    botSettingsFilePath: process.env.BOT_SETTINGS_FILE_PATH?.trim() || 'data/bot_settings.json',
 
     imgbedBaseUrl: normalizeBaseUrl(requireString('IMGBED_BASE_URL')),
     imgbedUploadToken: requireString('IMGBED_UPLOAD_TOKEN'),
     imgbedUploadPath: process.env.IMGBED_UPLOAD_PATH?.trim() || '/upload',
-
-    runtimeConfigPath: process.env.RUNTIME_CONFIG_PATH?.trim() || 'data/runtime-config.json',
 
     requestTimeoutMs: parseNumber('REQUEST_TIMEOUT_MS', 10000, { min: 100 }),
     retryMaxAttempts: parseNumber('RETRY_MAX_ATTEMPTS', 3, { min: 1 }),

@@ -4,3 +4,5 @@ dist/
 package-lock.json
 CLAUDE.md
 .claude/
+
+data/bot_settings.json

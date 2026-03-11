@@ -12,13 +12,15 @@ function makeEnv(): AppEnv {
     telegramBotToken: 'bot-token',
     telegramWebhookUrl: 'https://example.com/telegram/webhook',
     telegramAllowedChatIds: new Set(['-100123']),
+
     telegramAdminUserIds: new Set(['42']),
+    telegramUploadFolderPresets: ['other'],
+
+    botSettingsFilePath: 'data/test-bot-settings.json',
 
     imgbedBaseUrl: 'https://imgbed.example',
     imgbedUploadToken: 'upload-token',
     imgbedUploadPath: '/upload',
-
-    runtimeConfigPath: 'data/test-runtime-config.json',
 
     requestTimeoutMs: 100,
     retryMaxAttempts: 2,
@@ -45,7 +47,34 @@ function adminCommandUpdate(text: string): Record<string, unknown> {
 }
 
 describe('admin menu integration', () => {
-  it('管理员 /config 触发菜单处理（不会走图片链路）', async () => {
+  it('非管理员 /settings 不触发菜单处理', async () => {
+    const env = makeEnv();
+    env.telegramAdminUserIds = new Set(['999']);
+
+    const app = createApp({
+      env,
+      logger: createLogger('error'),
+      dedupStore: createDedupStore('memory'),
+      telegramWebhookDeps: {
+        downloadFn: vi.fn(),
+        uploadFn: vi.fn(),
+        sendMessageFn: vi.fn(),
+        botSettingsDeps: {
+          sendMessageFn: vi.fn().mockResolvedValue(undefined),
+          answerCallbackQueryFn: vi.fn().mockResolvedValue(undefined),
+          editMessageTextFn: vi.fn().mockResolvedValue(undefined)
+        }
+      }
+    });
+
+    const response = await request(app).post('/telegram/webhook').send(adminCommandUpdate('/settings'));
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+    expect(response.body.ignored).toBe(true);
+  });
+
+  it('管理员 /settings 触发菜单处理（不会走图片链路）', async () => {
     const env = makeEnv();
 
     const downloadFn = vi.fn();
@@ -60,15 +89,19 @@ describe('admin menu integration', () => {
         downloadFn,
         uploadFn,
         sendMessageFn,
-        loadRuntimeConfigFn: vi.fn().mockResolvedValue({ imgbed: { uploadFolder: 'x' } })
+        botSettingsDeps: {
+          sendMessageFn: vi.fn().mockResolvedValue(undefined),
+          answerCallbackQueryFn: vi.fn().mockResolvedValue(undefined),
+          editMessageTextFn: vi.fn().mockResolvedValue(undefined)
+        }
       }
     });
 
-    const response = await request(app).post('/telegram/webhook').send(adminCommandUpdate('/config'));
+    const response = await request(app).post('/telegram/webhook').send(adminCommandUpdate('/settings'));
 
     expect(response.status).toBe(200);
     expect(response.body.ok).toBe(true);
-    expect(response.body.handled).toBe(true);
+    expect(response.body.settings).toBe(true);
 
     expect(downloadFn).not.toHaveBeenCalled();
     expect(uploadFn).not.toHaveBeenCalled();
