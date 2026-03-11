@@ -9,9 +9,14 @@ const baseEnv: AppEnv = {
   telegramBotToken: 'bot-token',
   telegramWebhookUrl: 'https://example.com/telegram/webhook',
   telegramAllowedChatIds: new Set(['-100123']),
+  telegramAdminUserIds: new Set(['42']),
+
   imgbedBaseUrl: 'https://imgbed.example',
   imgbedUploadToken: 'upload-token',
   imgbedUploadPath: '/upload',
+
+  runtimeConfigPath: 'data/test-runtime-config.json',
+
   requestTimeoutMs: 50,
   retryMaxAttempts: 2,
   maxUploadBytes: 1024 * 1024,

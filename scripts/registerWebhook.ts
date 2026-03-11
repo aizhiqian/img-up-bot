@@ -51,7 +51,7 @@ async function telegramApi(botToken: string, method: string, body?: unknown): Pr
 async function setWebhook(botToken: string, webhookUrl: string): Promise<void> {
   const result = await telegramApi(botToken, 'setWebhook', {
     url: webhookUrl,
-    allowed_updates: ['channel_post', 'edited_channel_post']
+    allowed_updates: ['channel_post', 'edited_channel_post', 'message', 'callback_query']
   });
 
   console.log(JSON.stringify(result, null, 2));

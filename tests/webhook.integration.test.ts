@@ -12,9 +12,14 @@ function makeEnv(): AppEnv {
     telegramBotToken: 'bot-token',
     telegramWebhookUrl: 'https://example.com/telegram/webhook',
     telegramAllowedChatIds: new Set(['-100123']),
+    telegramAdminUserIds: new Set(['42']),
+
     imgbedBaseUrl: 'https://imgbed.example',
     imgbedUploadToken: 'upload-token',
     imgbedUploadPath: '/upload',
+
+    runtimeConfigPath: 'data/test-runtime-config.json',
+
     requestTimeoutMs: 100,
     retryMaxAttempts: 2,
     maxUploadBytes: 1024 * 1024,
@@ -52,6 +57,41 @@ function validDocumentImageUpdate(messageId: number): Record<string, unknown> {
 }
 
 describe('telegram webhook integration', () => {
+  it('应用运行时配置覆盖 ImgBed 上传参数（通过 env.imgbedUploadPath 透传给 uploadFn）', async () => {
+    const env = makeEnv();
+
+    const uploadFn = vi.fn().mockResolvedValue('https://imgbed.example/img/override.jpg');
+
+    const app = createApp({
+      env,
+      logger: createLogger('error'),
+      dedupStore: createDedupStore('memory'),
+      telegramWebhookDeps: {
+        downloadFn: vi.fn().mockResolvedValue({
+          buffer: Buffer.from('img-bytes'),
+          contentType: 'image/jpeg',
+          filePath: 'photos/file_override.jpg'
+        }),
+        uploadFn,
+        sendMessageFn: vi.fn().mockResolvedValue(undefined),
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({
+          imgbed: {
+            uploadFolder: 'runtime-folder'
+          }
+        })
+      }
+    });
+
+    const response = await request(app).post('/telegram/webhook').send(validUpdate(10));
+
+    expect(response.status).toBe(200);
+    expect(response.body.ok).toBe(true);
+
+    const passedEnv = uploadFn.mock.calls[0]?.[2] as AppEnv;
+    expect(passedEnv.imgbedUploadPath).toContain('uploadFolder=runtime-folder');
+  });
+
+
   it('完整链路：webhook -> 下载 -> 上传 -> 回写', async () => {
     const env = makeEnv();
     const dedup = createDedupStore('memory');
@@ -71,7 +111,12 @@ describe('telegram webhook integration', () => {
       telegramWebhookDeps: {
         downloadFn,
         uploadFn,
-        sendMessageFn
+        sendMessageFn,
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({
+          imgbed: {
+            uploadFolder: 'from-runtime'
+          }
+        })
       }
     });
 
@@ -104,7 +149,8 @@ describe('telegram webhook integration', () => {
       telegramWebhookDeps: {
         downloadFn,
         uploadFn,
-        sendMessageFn
+        sendMessageFn,
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({})
       }
     });
 
@@ -133,7 +179,8 @@ describe('telegram webhook integration', () => {
       telegramWebhookDeps: {
         downloadFn,
         uploadFn,
-        sendMessageFn: vi.fn()
+        sendMessageFn: vi.fn(),
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({})
       }
     });
 
@@ -173,7 +220,8 @@ describe('telegram webhook integration', () => {
       telegramWebhookDeps: {
         downloadFn,
         uploadFn,
-        sendMessageFn
+        sendMessageFn,
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({})
       }
     });
 
@@ -201,7 +249,8 @@ describe('telegram webhook integration', () => {
           filePath: 'photos/file_3.jpg'
         }),
         uploadFn: vi.fn().mockRejectedValue(new Error('upload failed')),
-        sendMessageFn: vi.fn()
+        sendMessageFn: vi.fn(),
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({})
       }
     });
 
@@ -228,7 +277,8 @@ describe('telegram webhook integration', () => {
           filePath: 'photos/file_4.jpg'
         }),
         uploadFn,
-        sendMessageFn: vi.fn().mockRejectedValue(new Error('send failed'))
+        sendMessageFn: vi.fn().mockRejectedValue(new Error('send failed')),
+        loadRuntimeConfigFn: vi.fn().mockResolvedValue({})
       }
     });
 

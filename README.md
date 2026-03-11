@@ -68,6 +68,8 @@ npm start
 
 - `PORT`（默认 `3000`）
 - `IMGBED_UPLOAD_PATH`（默认 `/upload`）
+- `RUNTIME_CONFIG_PATH`（默认 `data/runtime-config.json`）
+- `TELEGRAM_ADMIN_USER_IDS`（可选，逗号分隔；配置后可使用 Bot 菜单修改 ImgBed 上传参数）
 - `REQUEST_TIMEOUT_MS`（默认 `10000`）
 - `RETRY_MAX_ATTEMPTS`（默认 `3`）
 - `MAX_UPLOAD_BYTES`（默认 `20971520`，20 MiB）

@@ -3,18 +3,26 @@ import { LogLevel } from '../utils/logger';
 export interface AppEnv {
   nodeEnv: string;
   port: number;
+
   telegramBotToken: string;
   telegramWebhookUrl: string;
   telegramAllowedChatIds: Set<string>;
+  telegramAdminUserIds: Set<string>;
+
   imgbedBaseUrl: string;
   imgbedUploadToken: string;
   imgbedUploadPath: string;
+
+  runtimeConfigPath: string;
+
   requestTimeoutMs: number;
   retryMaxAttempts: number;
   maxUploadBytes: number;
   logLevel: LogLevel;
+
   enableChannelReply: boolean;
   channelReplyTemplate?: string;
+
   dedupStoreType: 'memory' | 'redis';
 }
 
@@ -28,6 +36,11 @@ function requireString(name: string): string {
 }
 
 function optionalString(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function optionalPath(name: string): string | undefined {
   const value = process.env[name]?.trim();
   return value ? value : undefined;
 }
@@ -96,6 +109,20 @@ function parseAllowedChatIds(raw: string): Set<string> {
   return new Set(ids);
 }
 
+function parseOptionalIdSet(raw: string | undefined): Set<string> {
+  const value = raw?.trim();
+  if (!value) {
+    return new Set();
+  }
+
+  const ids = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return new Set(ids);
+}
+
 function parseDedupStoreType(raw: string | undefined): 'memory' | 'redis' {
   const value = raw?.trim() ?? 'memory';
   if (value === 'memory' || value === 'redis') {
@@ -115,18 +142,26 @@ export function loadEnv(): AppEnv {
   return {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseNumber('PORT', 3000, { min: 1 }),
+
     telegramBotToken: requireString('TELEGRAM_BOT_TOKEN'),
     telegramWebhookUrl: requireString('TELEGRAM_WEBHOOK_URL'),
     telegramAllowedChatIds: parseAllowedChatIds(telegramAllowedChatIdsRaw),
+    telegramAdminUserIds: parseOptionalIdSet(process.env.TELEGRAM_ADMIN_USER_IDS),
+
     imgbedBaseUrl: normalizeBaseUrl(requireString('IMGBED_BASE_URL')),
     imgbedUploadToken: requireString('IMGBED_UPLOAD_TOKEN'),
     imgbedUploadPath: process.env.IMGBED_UPLOAD_PATH?.trim() || '/upload',
+
+    runtimeConfigPath: process.env.RUNTIME_CONFIG_PATH?.trim() || 'data/runtime-config.json',
+
     requestTimeoutMs: parseNumber('REQUEST_TIMEOUT_MS', 10000, { min: 100 }),
     retryMaxAttempts: parseNumber('RETRY_MAX_ATTEMPTS', 3, { min: 1 }),
     maxUploadBytes: parseNumber('MAX_UPLOAD_BYTES', 20 * 1024 * 1024, { min: 1 }),
     logLevel: parseLogLevel('LOG_LEVEL', 'info'),
+
     enableChannelReply: parseBoolean('ENABLE_CHANNEL_REPLY', true),
     channelReplyTemplate: optionalString('CHANNEL_REPLY_TEMPLATE'),
+
     dedupStoreType: parseDedupStoreType(process.env.DEDUP_STORE_TYPE)
   };
 }
